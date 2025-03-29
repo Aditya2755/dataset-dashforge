@@ -93,7 +93,14 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results }) => {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />
                         <YAxis domain={[0, 100]} />
-                        <Tooltip formatter={(value) => `${value.toFixed(2)}%`} />
+                        <Tooltip 
+                          formatter={(value) => {
+                            if (typeof value === 'number') {
+                              return `${value.toFixed(2)}%`;
+                            }
+                            return value;
+                          }} 
+                        />
                         <Bar dataKey="value" fill="#8884d8" name="Value (%)" />
                       </BarChart>
                     </ResponsiveContainer>
