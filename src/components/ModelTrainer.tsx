@@ -220,32 +220,124 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
   };
   
   const generateFakeResults = () => {
-    // Generate fake results based on the algorithm and hyperparameters
-    const accuracy = 0.7 + (Math.random() * 0.25);
-    const precision = 0.65 + (Math.random() * 0.3);
-    const recall = 0.6 + (Math.random() * 0.35);
-    const f1Score = 0.68 + (Math.random() * 0.28);
+    // Generate more realistic fake results based on the algorithm and hyperparameters
+    
+    // Base accuracy varies by algorithm
+    let baseAccuracy = 0.75;
+    if (selectedAlgorithm === 'randomforest' || selectedAlgorithm === 'xgboost') {
+      baseAccuracy = 0.85; // Random Forest and XGBoost typically perform well
+    } else if (selectedAlgorithm === 'neuralnet') {
+      baseAccuracy = 0.82; // Neural networks can be very good
+    } else if (selectedAlgorithm === 'svm') {
+      baseAccuracy = 0.80; // SVM often performs well
+    } else if (selectedAlgorithm === 'knn') {
+      baseAccuracy = 0.75; // KNN might be less accurate
+    } else if (selectedAlgorithm === 'decisiontree') {
+      baseAccuracy = 0.70; // Single decision trees are usually less accurate
+    }
+    
+    // Hyperparameter influence on results
+    let hyperparameterModifier = 0;
+    
+    if (selectedAlgorithm === 'randomforest' || selectedAlgorithm === 'xgboost') {
+      // More trees generally improves performance to a point
+      if (hyperparameters.n_estimators > 100) {
+        hyperparameterModifier += 0.03;
+      }
+      // Too deep trees can overfit
+      if (hyperparameters.max_depth > 15) {
+        hyperparameterModifier -= 0.02;
+      }
+    } else if (selectedAlgorithm === 'neuralnet') {
+      // More layers can help but may lead to overfitting
+      if (hyperparameters.hidden_layers > 3) {
+        hyperparameterModifier += 0.02;
+      }
+      // Better learning rate
+      if (hyperparameters.learning_rate < 0.01) {
+        hyperparameterModifier += 0.03;
+      }
+    }
+    
+    // Preprocessing influence on results
+    if (preprocessingOptions.scaling !== 'none') {
+      hyperparameterModifier += 0.02; // Scaling usually helps
+    }
+    if (preprocessingOptions.dimensionReduction !== 'none') {
+      hyperparameterModifier += 0.01; // Dimension reduction can help
+    }
+    
+    // Add some randomness
+    const randomness = (Math.random() * 0.06) - 0.03;
+    
+    // Calculate final accuracy and related metrics
+    let accuracy = Math.min(0.98, Math.max(0.5, baseAccuracy + hyperparameterModifier + randomness));
+    let precision = accuracy - (Math.random() * 0.05);
+    let recall = accuracy - (Math.random() * 0.07);
+    let f1Score = 2 * (precision * recall) / (precision + recall);
+    
+    // Confusion matrix based on accuracy
+    const totalSamples = 100;
+    const truePositives = Math.floor((accuracy * totalSamples) / 2);
+    const trueNegatives = Math.floor((accuracy * totalSamples) / 2);
+    const falsePositives = Math.floor(((1 - accuracy) * totalSamples) / 2);
+    const falseNegatives = totalSamples - truePositives - trueNegatives - falsePositives;
+    
+    // Generate training history (learning curve)
+    const trainingHistory = Array.from({ length: 10 }, (_, i) => {
+      // Create decreasing loss values that plateau
+      const epoch = i + 1;
+      const baseLoss = 1.0 - (0.8 * (1 - Math.exp(-0.4 * epoch)));
+      const trainingLoss = baseLoss * (1 - (hyperparameterModifier / 2));
+      // Validation loss is usually higher and more variable
+      const validationLoss = trainingLoss * (1 + (Math.random() * 0.2)) + (Math.random() * 0.05);
+      
+      return {
+        epoch,
+        training_loss: parseFloat(trainingLoss.toFixed(4)),
+        validation_loss: parseFloat(validationLoss.toFixed(4))
+      };
+    });
+    
+    // Feature importance based on algorithm
+    const featureImportance = [];
+    const featureCount = 8;
+    
+    // Create feature names based on dataset
+    const featureNames = Array.from({ length: featureCount }, (_, i) => 
+      datasetId.includes('iris') 
+        ? ['Sepal Length', 'Sepal Width', 'Petal Length', 'Petal Width'][i % 4] 
+        : `Feature ${i+1}`
+    );
+    
+    // Generate feature importance values
+    let totalImportance = 0;
+    const rawImportances = Array.from({ length: featureCount }, () => Math.random());
+    const sumImportances = rawImportances.reduce((sum, val) => sum + val, 0);
+    
+    for (let i = 0; i < featureCount; i++) {
+      const importance = rawImportances[i] / sumImportances;
+      featureImportance.push({
+        feature: featureNames[i],
+        importance: parseFloat(importance.toFixed(4))
+      });
+    }
+    
+    featureImportance.sort((a, b) => b.importance - a.importance);
     
     const results = {
       metrics: {
-        accuracy,
-        precision,
-        recall,
-        f1Score,
+        accuracy: parseFloat(accuracy.toFixed(4)),
+        precision: parseFloat(precision.toFixed(4)),
+        recall: parseFloat(recall.toFixed(4)),
+        f1Score: parseFloat(f1Score.toFixed(4)),
       },
       confusion_matrix: [
-        [Math.floor(Math.random() * 50) + 30, Math.floor(Math.random() * 15) + 5],
-        [Math.floor(Math.random() * 15) + 5, Math.floor(Math.random() * 50) + 30]
+        [trueNegatives, falsePositives],
+        [falseNegatives, truePositives]
       ],
-      feature_importance: Array.from({ length: 6 }, () => Math.random()).map((v, i) => ({
-        feature: `Feature ${i+1}`,
-        importance: v
-      })).sort((a, b) => b.importance - a.importance),
-      training_history: Array.from({ length: 10 }, (_, i) => ({
-        epoch: i + 1,
-        training_loss: 1 - (0.7 * (1 - Math.exp(-0.5 * i))),
-        validation_loss: 1 - (0.6 * (1 - Math.exp(-0.4 * i))) + (Math.random() * 0.1)
-      })),
+      feature_importance: featureImportance,
+      training_history: trainingHistory,
       python_code: generatePythonCode(selectedAlgorithm, hyperparameters, preprocessingOptions)
     };
     

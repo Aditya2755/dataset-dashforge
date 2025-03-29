@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { ChartBar, LineChart as LineChartIcon, FileText, Download } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface ResultsDashboardProps {
   results: {
@@ -23,7 +23,7 @@ interface ResultsDashboardProps {
 }
 
 const ResultsDashboard: React.FC<ResultsDashboardProps> = ({ results }) => {
-  const [activeTab, setActiveTab] = useState("metrics");
+  const [activeTab, setActiveTab] = useState<string>("metrics");
   const { toast } = useToast();
 
   const metricsData = [
