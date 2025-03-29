@@ -7,8 +7,9 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChartBar, PlayCircle, Sliders, Settings, Activity } from "lucide-react";
+import { ChartBar, PlayCircle, Sliders, Settings, Activity, Database } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { DataPreprocessor } from "@/components/DataPreprocessor";
 
 interface ModelTrainerProps {
   datasetId: string;
@@ -45,6 +46,8 @@ const ALGORITHMS: Algorithm[] = [
       { id: "max_depth", name: "Max Depth", type: "range", min: 1, max: 30, step: 1, default: 10 },
       { id: "min_samples_split", name: "Min Samples to Split", type: "range", min: 2, max: 20, step: 1, default: 2 },
       { id: "bootstrap", name: "Bootstrap Samples", type: "switch", default: true },
+      { id: "criterion", name: "Split Criterion", type: "select", default: "gini", options: ["gini", "entropy"] },
+      { id: "max_features", name: "Max Features", type: "select", default: "sqrt", options: ["sqrt", "log2", "None"] },
     ]
   },
   {
@@ -56,6 +59,9 @@ const ALGORITHMS: Algorithm[] = [
       { id: "C", name: "Regularization Parameter", type: "range", min: 0.1, max: 10, step: 0.1, default: 1.0 },
       { id: "kernel", name: "Kernel", type: "select", default: "rbf", options: ["linear", "poly", "rbf", "sigmoid"] },
       { id: "gamma", name: "Kernel Coefficient", type: "range", min: 0.001, max: 1, step: 0.001, default: 0.1 },
+      { id: "degree", name: "Polynomial Degree", type: "range", min: 1, max: 10, step: 1, default: 3 },
+      { id: "probability", name: "Enable Probability", type: "switch", default: true },
+      { id: "class_weight", name: "Class Weight", type: "select", default: "None", options: ["None", "balanced"] },
     ]
   },
   {
@@ -69,6 +75,9 @@ const ALGORITHMS: Algorithm[] = [
       { id: "activation", name: "Activation Function", type: "select", default: "relu", options: ["relu", "tanh", "sigmoid"] },
       { id: "learning_rate", name: "Learning Rate", type: "range", min: 0.0001, max: 0.1, step: 0.0001, default: 0.001 },
       { id: "dropout", name: "Dropout Rate", type: "range", min: 0, max: 0.5, step: 0.1, default: 0.2 },
+      { id: "batch_size", name: "Batch Size", type: "range", min: 8, max: 256, step: 8, default: 32 },
+      { id: "alpha", name: "Regularization Alpha", type: "range", min: 0.0001, max: 0.1, step: 0.0001, default: 0.0001 },
+      { id: "max_iter", name: "Max Iterations", type: "range", min: 100, max: 2000, step: 100, default: 1000 },
     ]
   },
   {
@@ -82,8 +91,50 @@ const ALGORITHMS: Algorithm[] = [
       { id: "max_depth", name: "Max Depth", type: "range", min: 3, max: 10, step: 1, default: 6 },
       { id: "subsample", name: "Subsample Ratio", type: "range", min: 0.5, max: 1, step: 0.1, default: 0.8 },
       { id: "colsample_bytree", name: "Column Sample by Tree", type: "range", min: 0.5, max: 1, step: 0.1, default: 0.8 },
+      { id: "gamma", name: "Minimum Loss Reduction", type: "range", min: 0, max: 1, step: 0.1, default: 0 },
+      { id: "min_child_weight", name: "Min Child Weight", type: "range", min: 1, max: 10, step: 1, default: 1 },
+      { id: "objective", name: "Objective", type: "select", default: "binary:logistic", options: ["binary:logistic", "multi:softmax", "reg:squarederror"] },
     ]
-  }
+  },
+  {
+    id: "knn",
+    name: "K-Nearest Neighbors",
+    type: "Classification/Regression",
+    description: "Simple and effective instance-based learning algorithm",
+    hyperparameters: [
+      { id: "n_neighbors", name: "Number of Neighbors", type: "range", min: 1, max: 30, step: 1, default: 5 },
+      { id: "weights", name: "Weight Function", type: "select", default: "uniform", options: ["uniform", "distance"] },
+      { id: "algorithm", name: "Algorithm", type: "select", default: "auto", options: ["auto", "ball_tree", "kd_tree", "brute"] },
+      { id: "leaf_size", name: "Leaf Size", type: "range", min: 10, max: 100, step: 10, default: 30 },
+      { id: "p", name: "Power Parameter", type: "range", min: 1, max: 5, step: 1, default: 2 },
+    ]
+  },
+  {
+    id: "decisiontree",
+    name: "Decision Tree",
+    type: "Classification/Regression",
+    description: "Simple tree-based model with good interpretability",
+    hyperparameters: [
+      { id: "max_depth", name: "Max Depth", type: "range", min: 1, max: 30, step: 1, default: 10 },
+      { id: "min_samples_split", name: "Min Samples to Split", type: "range", min: 2, max: 20, step: 1, default: 2 },
+      { id: "min_samples_leaf", name: "Min Samples per Leaf", type: "range", min: 1, max: 20, step: 1, default: 1 },
+      { id: "criterion", name: "Split Criterion", type: "select", default: "gini", options: ["gini", "entropy"] },
+      { id: "splitter", name: "Splitter", type: "select", default: "best", options: ["best", "random"] },
+    ]
+  },
+  {
+    id: "logistic",
+    name: "Logistic Regression",
+    type: "Classification",
+    description: "Simple and interpretable linear model for classification",
+    hyperparameters: [
+      { id: "C", name: "Regularization Strength", type: "range", min: 0.1, max: 10, step: 0.1, default: 1.0 },
+      { id: "penalty", name: "Penalty", type: "select", default: "l2", options: ["l1", "l2", "elasticnet", "none"] },
+      { id: "solver", name: "Solver", type: "select", default: "lbfgs", options: ["newton-cg", "lbfgs", "liblinear", "sag", "saga"] },
+      { id: "max_iter", name: "Max Iterations", type: "range", min: 100, max: 1000, step: 100, default: 100 },
+      { id: "warm_start", name: "Warm Start", type: "switch", default: false },
+    ]
+  },
 ];
 
 const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete }) => {
@@ -91,6 +142,13 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
   const [hyperparameters, setHyperparameters] = useState<Record<string, any>>({});
   const [isTraining, setIsTraining] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [activeTab, setActiveTab] = useState<'algorithm' | 'hyperparameters' | 'preprocessing'>('algorithm');
+  const [preprocessingOptions, setPreprocessingOptions] = useState({
+    scaling: 'none',
+    missingValues: 'drop',
+    featureSelection: 'none',
+    dimensionReduction: 'none'
+  });
   const { toast } = useToast();
 
   const handleAlgorithmSelect = (algorithmId: string) => {
@@ -114,6 +172,13 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
       [parameterId]: value
     }));
   };
+
+  const handlePreprocessingOptionChange = (option: string, value: string) => {
+    setPreprocessingOptions(prev => ({
+      ...prev,
+      [option]: value
+    }));
+  };
   
   const handleTrainStart = () => {
     if (!selectedAlgorithm) return;
@@ -125,6 +190,17 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
       title: "Training Started",
       description: `Training model using ${ALGORITHMS.find(a => a.id === selectedAlgorithm)?.name}`,
     });
+
+    // Prepare data for API call
+    const trainingData = {
+      datasetId,
+      algorithm: selectedAlgorithm,
+      hyperparameters,
+      preprocessing: preprocessingOptions,
+    };
+
+    // Mock API call to Python backend
+    console.log('Sending training request to Python API:', trainingData);
     
     // Simulate training progress
     const interval = setInterval(() => {
@@ -169,7 +245,8 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
         epoch: i + 1,
         training_loss: 1 - (0.7 * (1 - Math.exp(-0.5 * i))),
         validation_loss: 1 - (0.6 * (1 - Math.exp(-0.4 * i))) + (Math.random() * 0.1)
-      }))
+      })),
+      python_code: generatePythonCode(selectedAlgorithm, hyperparameters, preprocessingOptions)
     };
     
     toast({
@@ -179,6 +256,256 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
     
     onTrainComplete(results);
   };
+
+  const generatePythonCode = (algorithmId: string | null, params: Record<string, any>, preprocessing: any) => {
+    if (!algorithmId) return '';
+    
+    const algorithm = ALGORITHMS.find(a => a.id === algorithmId);
+    if (!algorithm) return '';
+    
+    // Generate Python code based on the selected algorithm and hyperparameters
+    let code = `
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+`;
+
+    // Add preprocessing imports
+    code += `
+# Preprocessing
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.impute import SimpleImputer
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.decomposition import PCA
+`;
+
+    // Add model-specific imports
+    switch (algorithmId) {
+      case 'randomforest':
+        code += 'from sklearn.ensemble import RandomForestClassifier\n';
+        break;
+      case 'svm':
+        code += 'from sklearn.svm import SVC\n';
+        break;
+      case 'neuralnet':
+        code += 'from sklearn.neural_network import MLPClassifier\n';
+        break;
+      case 'xgboost':
+        code += 'import xgboost as xgb\n';
+        break;
+      case 'knn':
+        code += 'from sklearn.neighbors import KNeighborsClassifier\n';
+        break;
+      case 'decisiontree':
+        code += 'from sklearn.tree import DecisionTreeClassifier\n';
+        break;
+      case 'logistic':
+        code += 'from sklearn.linear_model import LogisticRegression\n';
+        break;
+    }
+    
+    // Add data loading
+    code += `
+# Load dataset
+# Replace with your data loading code
+data = pd.read_csv('your_dataset.csv')
+X = data.drop('target', axis=1)
+y = data['target']
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+`;
+
+    // Add preprocessing steps
+    code += `
+# Preprocessing steps
+`;
+    
+    if (preprocessing.scaling !== 'none') {
+      if (preprocessing.scaling === 'standard') {
+        code += `
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)`;
+      } else if (preprocessing.scaling === 'minmax') {
+        code += `
+scaler = MinMaxScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)`;
+      }
+    }
+    
+    if (preprocessing.missingValues !== 'none') {
+      if (preprocessing.missingValues === 'drop') {
+        code += `
+# Drop rows with missing values
+X_train = pd.DataFrame(X_train).dropna()
+y_train = y_train[X_train.index]
+X_test = pd.DataFrame(X_test).dropna()
+y_test = y_test[X_test.index]`;
+      } else if (preprocessing.missingValues === 'mean') {
+        code += `
+# Impute missing values with mean
+imputer = SimpleImputer(strategy='mean')
+X_train = imputer.fit_transform(X_train)
+X_test = imputer.transform(X_test)`;
+      } else if (preprocessing.missingValues === 'median') {
+        code += `
+# Impute missing values with median
+imputer = SimpleImputer(strategy='median')
+X_train = imputer.fit_transform(X_train)
+X_test = imputer.transform(X_test)`;
+      }
+    }
+    
+    if (preprocessing.featureSelection !== 'none') {
+      code += `
+# Feature selection
+selector = SelectKBest(f_classif, k=10)  # Select top 10 features
+X_train = selector.fit_transform(X_train, y_train)
+X_test = selector.transform(X_test)`;
+    }
+    
+    if (preprocessing.dimensionReduction !== 'none') {
+      const n_components = preprocessing.dimensionReduction === 'pca_half' ? 'X_train.shape[1] // 2' : '2';
+      code += `
+# Dimension reduction with PCA
+pca = PCA(n_components=${n_components})
+X_train = pca.fit_transform(X_train)
+X_test = pca.transform(X_test)`;
+    }
+    
+    // Add model creation and hyperparameters
+    code += `
+# Model definition
+`;
+    
+    switch (algorithmId) {
+      case 'randomforest':
+        code += `model = RandomForestClassifier(
+    n_estimators=${params.n_estimators},
+    max_depth=${params.max_depth !== 'None' ? params.max_depth : 'None'},
+    min_samples_split=${params.min_samples_split},
+    bootstrap=${params.bootstrap},
+    criterion='${params.criterion}',
+    max_features='${params.max_features === 'None' ? 'None' : params.max_features}',
+    random_state=42
+)`;
+        break;
+      case 'svm':
+        code += `model = SVC(
+    C=${params.C},
+    kernel='${params.kernel}',
+    gamma=${params.gamma},
+    degree=${params.degree},
+    probability=${params.probability},
+    class_weight=${params.class_weight === 'None' ? 'None' : "'" + params.class_weight + "'"},
+    random_state=42
+)`;
+        break;
+      case 'neuralnet':
+        code += `model = MLPClassifier(
+    hidden_layer_sizes=(${Array(params.hidden_layers).fill(params.neurons).join(', ')}),
+    activation='${params.activation}',
+    learning_rate_init=${params.learning_rate},
+    alpha=${params.alpha},
+    batch_size=${params.batch_size},
+    max_iter=${params.max_iter},
+    random_state=42
+)`;
+        break;
+      case 'xgboost':
+        code += `model = xgb.XGBClassifier(
+    n_estimators=${params.n_estimators},
+    learning_rate=${params.learning_rate},
+    max_depth=${params.max_depth},
+    subsample=${params.subsample},
+    colsample_bytree=${params.colsample_bytree},
+    gamma=${params.gamma},
+    min_child_weight=${params.min_child_weight},
+    objective='${params.objective}',
+    random_state=42
+)`;
+        break;
+      case 'knn':
+        code += `model = KNeighborsClassifier(
+    n_neighbors=${params.n_neighbors},
+    weights='${params.weights}',
+    algorithm='${params.algorithm}',
+    leaf_size=${params.leaf_size},
+    p=${params.p}
+)`;
+        break;
+      case 'decisiontree':
+        code += `model = DecisionTreeClassifier(
+    max_depth=${params.max_depth},
+    min_samples_split=${params.min_samples_split},
+    min_samples_leaf=${params.min_samples_leaf},
+    criterion='${params.criterion}',
+    splitter='${params.splitter}',
+    random_state=42
+)`;
+        break;
+      case 'logistic':
+        code += `model = LogisticRegression(
+    C=${params.C},
+    penalty='${params.penalty}',
+    solver='${params.solver}',
+    max_iter=${params.max_iter},
+    warm_start=${params.warm_start},
+    random_state=42
+)`;
+        break;
+    }
+    
+    // Add training, evaluation, and visualization
+    code += `
+
+# Train model
+model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = model.predict(X_test)
+
+# Evaluate model
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+conf_matrix = confusion_matrix(y_test, y_pred)
+
+print(f"Accuracy: {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1 Score: {f1:.4f}")
+print("Confusion Matrix:")
+print(conf_matrix)
+
+# Feature importance (if applicable)
+`;
+
+    if (['randomforest', 'xgboost', 'decisiontree'].includes(algorithmId)) {
+      code += `
+# Plot feature importance
+import matplotlib.pyplot as plt
+
+if hasattr(model, 'feature_importances_'):
+    importances = model.feature_importances_
+    features = X.columns if hasattr(X, 'columns') else [f'Feature {i}' for i in range(X.shape[1])]
+    indices = np.argsort(importances)[::-1]
+    
+    plt.figure(figsize=(10, 6))
+    plt.title('Feature Importance')
+    plt.bar(range(len(indices)), importances[indices], align='center')
+    plt.xticks(range(len(indices)), [features[i] for i in indices], rotation=90)
+    plt.tight_layout()
+    plt.show()
+`;
+    }
+    
+    return code;
+  };
   
   const selectedAlgorithmData = ALGORITHMS.find(a => a.id === selectedAlgorithm);
   
@@ -186,14 +513,18 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
     <Card className="w-full animate-fade-in">
       <CardHeader>
         <CardTitle className="text-xl font-bold">Train Model</CardTitle>
-        <CardDescription>Select an algorithm and configure hyperparameters</CardDescription>
+        <CardDescription>Select an algorithm, configure preprocessing and hyperparameters</CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="algorithm">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="algorithm">
               <ChartBar className="w-4 h-4 mr-2" />
               Algorithm
+            </TabsTrigger>
+            <TabsTrigger value="preprocessing" disabled={!selectedAlgorithm}>
+              <Database className="w-4 h-4 mr-2" />
+              Preprocessing
             </TabsTrigger>
             <TabsTrigger value="hyperparameters" disabled={!selectedAlgorithm}>
               <Sliders className="w-4 h-4 mr-2" />
@@ -219,6 +550,13 @@ const ModelTrainer: React.FC<ModelTrainerProps> = ({ datasetId, onTrainComplete 
                 </Card>
               ))}
             </div>
+          </TabsContent>
+          
+          <TabsContent value="preprocessing" className="space-y-6 mt-4">
+            <DataPreprocessor 
+              options={preprocessingOptions}
+              onOptionChange={handlePreprocessingOptionChange}
+            />
           </TabsContent>
           
           <TabsContent value="hyperparameters" className="space-y-6 mt-4">
